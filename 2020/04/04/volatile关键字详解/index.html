@@ -28,7 +28,7 @@
 <meta property="og:description" content="volatile是jvm提供的轻量级的同步机制，具有三大特性：保证可见性、不保证原子性、禁止指令重排。 在了解三大特性之前，我们需要了解一下java的内存模型–JMM (Java Memory Model)，它是一种抽象的概念，并不真实存在。它描述的是一组规则或规范，定义的是程序里的各个变量的访问方式。 JMM中关于同步的三条规定：    线程解锁前，必须把共享变量的值刷新回主内存   线程加锁前">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2020-04-04T06:52:47.172Z">
-<meta property="article:modified_time" content="2020-04-07T06:43:48.561Z">
+<meta property="article:modified_time" content="2020-04-07T06:56:20.690Z">
 <meta property="article:author" content="汪小雨">
 <meta name="twitter:card" content="summary">
     <meta http-equiv="Cache-control" content="no-cache">
@@ -415,75 +415,217 @@ height:50vh;
 <li>线程加锁前，必须读取主内存的最新值到自己的<font color="red">工作内存</font>  </li>
 <li>加锁和解锁用的是同一把锁   </li>
 </ul>
-<p>图解：<br><a href="https://ae01.alicdn.com/kf/H2b6846c8c1de4de3872540be22584c977.jpg" target="_blank" rel="noopener">图1</a><br>主物理内存中存在一个Student对象，它有一个属性age，初始值为15。存在t1和t2线程想要修改主内存中的age的值，但并无法直接修改主内存中的变量值，需要先将变量拷贝回自己的工作内存，先在自己的工作内存中进行操作。  </p>
+<p>图解：<br>!<a href="https://ae01.alicdn.com/kf/H2b6846c8c1de4de3872540be22584c977.jpg" target="_blank" rel="noopener">图1</a><br>主物理内存中存在一个Student对象，它有一个属性age，初始值为15。存在t1和t2线程想要修改主内存中的age的值，但并无法直接修改主内存中的变量值，需要先将变量拷贝回自己的工作内存，先在自己的工作内存中进行操作。  </p>
 <p><a href="https://ae01.alicdn.com/kf/H45281996c7194a7d9406459871f348fb5.jpg" target="_blank" rel="noopener">图2</a><br>此时线程t1将自己工作内存中的变量值修改为12，接着就会将主内存中的值修改为12，同时此操作会被线程t2知晓，这也就是可见性的体现。  </p>
 <p>由于JMM操作的是实体是线程，而每个线程创建时JVM会为其创建一个工作内存（也就是栈空间）。工作内存是每个线程的私有数据区域，JMM规定所有变量都是储存在主内存中，即主内存是共享内存区域，所有线程都可以访问。</p>
 <p>需要注意的是：线程对变量的操作都必须在自己的工作内存中进行，首先将变量从主内存拷贝到自己的工作内存，然后对变量进行操作，操作完成后再写回主内存。</p>
 <p>因此，不同线程无法访问对方的工作内存，线程间的传值必须通过主内存来完成。  </p>
 <p><strong>volatile的保证可见性：</strong>  </p>
-<blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">class Source&#123;</span><br><span class="line">    int number &#x3D; 0;</span><br><span class="line">    public void add()&#123;</span><br><span class="line">        this.number &#x3D; 20;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">public class VolatileDemo &#123;</span><br><span class="line">    public static void main(String[] args)&#123;</span><br><span class="line">        Source source &#x3D; new Source();</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            System.out.println(Thread.currentThread().getName()+&quot;come in&quot;);</span><br><span class="line">            try&#123;</span><br><span class="line">                TimeUnit.SECONDS.sleep(3);</span><br><span class="line">            &#125;catch (InterruptedException e)&#123;</span><br><span class="line">                e.printStackTrace();</span><br><span class="line">            &#125;</span><br><span class="line">            source.add();</span><br><span class="line">            System.out.println(Thread.currentThread().getName()+&quot; update value &quot;+source.number);</span><br><span class="line">        &#125;,&quot;t1&quot;).start();</span><br><span class="line">        while(source.number &#x3D;&#x3D; 0)&#123;</span><br><span class="line">            &#x2F;&#x2F;main线程会一直循环读取number的值，直到number不为0</span><br><span class="line">        &#125;</span><br><span class="line">        System.out.println(Thread.currentThread().getName()+&quot; is over&quot;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">&#96;&#96;&#96;  </span><br><span class="line"></span><br><span class="line">结果为：</span><br><span class="line">t1come in</span><br><span class="line">t1 update value 20  </span><br><span class="line">三秒后t1线程修改了number的值为20，主线程一直都在循环中，程序无法自动退出。也就是，主线程一直不知道number已被改为其他值。  </span><br><span class="line"></span><br><span class="line">将变量number前加volatile: </span><br></pre></td></tr></table></figure>
-<p>class Source{<br>    volatile int number = 0;<br>    public void add(){<br>        this.number = 20;<br>    }<br>}</p>
-</blockquote>
-<p>public class VolatileDemo {<br>    public static void main(String[] args){<br>        Source source = new Source();<br>        new Thread(()-&gt;{<br>            System.out.println(Thread.currentThread().getName()+”come in”);<br>            try{<br>                TimeUnit.SECONDS.sleep(3);<br>            }catch (InterruptedException e){<br>                e.printStackTrace();<br>            }<br>            source.add();<br>            System.out.println(Thread.currentThread().getName()+” update value “+source.number);<br>        },”t1”).start();</p>
-<pre><code>    while(source.number == 0){
-        //main线程会一直循环读取number的值，直到number不为0
+<pre><code class="java"><span class="class"><span class="keyword">class</span> <span class="title">Source</span></span>{
+    <span class="keyword">int</span> number = <span class="number">0</span>;
+    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">()</span></span>{
+        <span class="keyword">this</span>.number = <span class="number">20</span>;
     }
-    System.out.println(Thread.currentThread().getName()+&quot; is over&quot;);
-}</code></pre><p>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">输出结果为：  </span><br><span class="line">t1come in</span><br><span class="line">t1 update value 20</span><br><span class="line">main is over  </span><br><span class="line">main线程不再一直在循环中等待，也就证明了volatile的保证可见性的特性。  </span><br><span class="line"></span><br><span class="line">**volatile的不保证原子性：**</span><br><span class="line">原子性代表的是不可分割，保证完整性，要么做完，要么不做。</span><br></pre></td></tr></table></figure>
-<p>class Source{<br>    volatile int number = 0;<br>    public void addPlus(){<br>        number++;<br>    }<br>}</p>
-<p>public class VolatileDemo {<br>    public static void main(String[] args){<br>        Source source = new Source();<br>        for(int i = 0;i &lt; 10;i++){<br>            new Thread(()-&gt;{<br>                for(int j = 0;j &lt; 100;j++){<br>                    source.addPlus();<br>                }<br>            },String.valueOf(i)).start();<br>        }<br>        //等待上面的线程执行完成后，调用main线程查看最终的number的值<br>        //判断大于2的原因是：除了main线程外还有一个后台GC线程<br>        while(Thread.activeCount() &gt; 2){<br>            Thread.yield();<br>        }<br>        System.out.println(Thread.currentThread().getName()+”current number is “+source.number);<br>    }<br>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">10个线程，每个线程执行100次number++的操作，如果volatile保证原子性的话，那最终的结果应该是1000。但是最终的运行结果不是，因此证明了volatile无法保证原子性。  </span><br><span class="line">那么为什么volatile不保证原子性呢？以下举例来解释：  </span><br><span class="line">首先有两个线程，二者均将主内存中的变量拷贝回自己的工作内存；  </span><br><span class="line">接着，当线程1调用addPlus()方法将自己的number值加1后(number&#x3D;1)，正准备写回主内存，可此时因底层调度机制，线程1被挂起；  </span><br><span class="line">然后，线程2在自己的时间片中完成了addPlus()方法，且将结果写回了主内存，但来不及通知线程1，number的值已经被修改为1；  </span><br><span class="line">最后，线程1被激活则会继续做未完成的步骤，即将在自己工作内存中改变的变量值写回到主内存，这样就造成数据复写和数据丢失的后果了。  </span><br><span class="line"></span><br><span class="line">那么如何保证原子性呢？  </span><br><span class="line">1、使用sychronized对变量进行加锁  </span><br><span class="line">在多线程的环境下不推荐此种用法，因为其虽然能解决问题，但是并发性差。  </span><br><span class="line">2、使用AtomicInteger(原子性整形封装，实在java.util.concurrent.atomic包下的)</span><br></pre></td></tr></table></figure>
-<p>class Source{<br>    AtomicInteger atomicInteger = new AtomicInteger();<br>    public void addAtomic(){<br>        atomicInteger.getAndIncrement();<br>    }<br>}</p>
-<p>public class VolatileDemo {<br>    public static void main(String[] args){<br>        Source source = new Source();<br>        for(int i = 0;i &lt; 10;i++){<br>            new Thread(()-&gt;{<br>                for(int j = 0;j &lt; 100;j++){<br>                    //source.addPlus();<br>                    source.addAtomic();<br>                }<br>            },String.valueOf(i)).start();<br>        }<br>        while(Thread.activeCount() &gt; 2){<br>            Thread.yield();<br>        }<br>        System.out.println(Thread.currentThread().getName()+”current number is “+source.atomicInteger);//使用的是原子性的number值<br>    }<br>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">此时输出的结果为1000，即保证了原子性。  </span><br><span class="line"></span><br><span class="line">**volatile的禁止重排序**  </span><br><span class="line">先了解一下有序性的相关概念  </span><br><span class="line">计算机在执行程序的时候，为了提高性能，编译器和处理器常常会对指令做重排序的操作，一般分为以下几种：  </span><br><span class="line">- 单线程环境里面确保程序最终执行结果和代码顺序执行的结果一致（即指令重排对单线程无影响）  </span><br><span class="line">- 处理器在进行重排序时必须要考虑指令之间的数据依赖性（即逻辑顺序）  </span><br><span class="line">- 多线程环境中线程交替执行，因编译器优化重排序的存在，多个线程使用的变量是否能保证一致性时无法确认的（结果无法预测）  </span><br><span class="line"></span><br><span class="line">指令重排：源代码按顺序排列，但是底层为了执行代码的效率能够得到提高，不一定也会按照源代码的编写顺序执行，尤其是多线程环境  </span><br><span class="line"></span><br><span class="line">例1：</span><br></pre></td></tr></table></figure>
-<p>public void sort(){<br>  int x = 1;     //1<br>  int y = 2;     //2<br>  x = x + 5;     //3<br>  y = x + x;     //4<br>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">那此时语句4是否可以为第一句？那肯定是不行的，因为变量必须得先定义，这样会违背数据的依赖性。    </span><br><span class="line"></span><br><span class="line">例2:</span><br></pre></td></tr></table></figure>
-<p>public class Demo{<br>  int a = 0;<br>  boolean flag = false;<br>  public void method(){<br>     a = 1;        //1<br>     flag = true;  //2<br>  }<br>  public void method01(){<br>      if(flag){<br>        a = a + 5;<br>        system.out.println(“a = “+a);<br>      }<br>  }<br>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">上述代码在多线程情况下则有可能会出现：一个线程的语句2先被执行，另一个线程先执行了method01()方法，导致最后的a &#x3D; 5，与正常顺序执行的a的结果不同，这样就没有抱枕该数据的一致性了。故需要用volatile来禁止指令重排。  </span><br><span class="line"></span><br><span class="line">以高并发下的DCL模式为例讲解禁止指令重排：</span><br></pre></td></tr></table></figure>
-<p>public class SingletonDemo {<br>    private static SingletonDemo instance = null;<br>    private SingletonDemo(){<br>        System.out.println(“无参构造方法”);<br>    }<br>    public static SingletonDemo getInstance(){<br>        if(instance == null){<br>             instance = new SingletonDemo();<br>        }<br>        return instance;<br>    }</p>
-<pre><code>public static void main(String[] args){
-    for(int i = 0;i &lt; 10;i++){
-        new Thread(()-&gt;{
-            SingletonDemo.getInstance();
-        },String.valueOf(i)).start();
-    }
-}</code></pre><p>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">在单线程模式下调用getInstance()方法只会输出一个 &quot;无参构造方法&quot;。但是若是在多线程环境下测试，则会多次输出，这样就算不上是单例的概念了。那么接下来就介绍DCL模式，即双端检索机制的代码。</span><br></pre></td></tr></table></figure>
-<p>public class SingletonDemo {<br>    private static SingletonDemo instance = null;<br>    private SingletonDemo(){<br>        System.out.println(“无参构造方法”);<br>    }<br>    public static SingletonDemo getInstance(){<br>        if(instance == null){<br>             synchronized (SingletonDemo.class){<br>                 if(instance == null){<br>                     instance = new SingletonDemo();<br>                 }<br>             }<br>        }<br>        return instance;<br>    }</p>
-<pre><code>public static void main(String[] args){
-    for(int i = 0;i &lt; 10;i++){
-        new Thread(()-&gt;{
-            SingletonDemo.getInstance();
-        },String.valueOf(i)).start();
-    }
-}</code></pre><p>}</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">instance &#x3D; new SingletonDemo();可以分成三步完成创建对象操作  </span><br><span class="line">1、memory &#x3D; allocate(); &#x2F;&#x2F;分配对象的内存空间  </span><br><span class="line">2、instance(memory); &#x2F;&#x2F;初始化对象   </span><br><span class="line">3、instance &#x3D; memory; &#x2F;&#x2F;设置instance第一步分配的内存空间  </span><br><span class="line">当执行的顺序变成1-&gt;3-&gt;2时，可知还未完成初始化怎能为初始化的对象指向地址。所以这种情况下还不是完全安全的，需要排除指令重排带来的问题，故可以使用volatile禁止指令重排的特性在instance前加volatile进行修饰，即：</span><br></pre></td></tr></table></figure>
-<p>private volatile static SingletonDemo instance = null;</p>
-<pre><code>
-禁止指令重排的知识小结：  
-1、volatile实现禁止指令重排优化，从而避免多线程环境下程序出现乱序执行现象；  
-2、**内存屏障**(Memory Barrier)，又可以称为内存栅栏，它是一个CPU指令，起到保证特定操作的执行顺序和保证某些变量的内存可见性的作用；  
-3、由于编译器和处理器都可以执行指令重排的优化指令，若在指令间加一条内存屏障，则可以高斯编译器和处理器，不论什么指令都不能和这条内存屏障指令进行重排序操作，也就是说可以通过内存屏障禁止在其前后的指令进行重排序；  
-4、写内存屏障（Store Memory Barrier）：处理器将存储缓存值写回主存（阻塞方式）  
-   读内存屏障（Load Memory Barrier）：处理器，处理失效队列（阻塞方式）  
-5、内存屏障种类  
-[图3](https://ae01.alicdn.com/kf/Hd5390602779c42869426934073c5a77dD.png)    
-6、volatile读前插读屏障，写后加写屏障，避免CPU重排导致的问题，实现多线程之间数据的可见性  
-7、对于处理器来说，内存屏障会导致cpu缓存的刷新，刷新时，会遵循缓存一致性协议:  
-- 解锁时(lock)，jvm会强制刷新cpu缓存，导致当前线程更改，对其他线程可见;  
-- 标记volatile的字段，在写操作时，会强制刷新cpu缓存，标记volatile的字段，每次读取都是直接读内存;  
-- 编译器在final写操作后，会插入内存屏障，来禁止重排序，保证可见性。  
+}
 
-**以上内容是自己学习时看书看视频教学查询网络的总结**</code></pre>
+<span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">VolatileDemo</span> </span>{
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        Source source = <span class="keyword">new</span> Source();
+        <span class="keyword">new</span> Thread(()-&gt;{
+            System.out.println(Thread.currentThread().getName()+<span class="string">"come in"</span>);
+            <span class="keyword">try</span>{
+                TimeUnit.SECONDS.sleep(<span class="number">3</span>);
+            }<span class="keyword">catch</span> (InterruptedException e){
+                e.printStackTrace();
+            }
+            source.add();
+            System.out.println(Thread.currentThread().getName()+<span class="string">" update value "</span>+source.number);
+        },<span class="string">"t1"</span>).start();
+
+        <span class="keyword">while</span>(source.number == <span class="number">0</span>){
+            <span class="comment">//main线程会一直循环读取number的值，直到number不为0</span>
+        }
+        System.out.println(Thread.currentThread().getName()+<span class="string">" is over"</span>);
+    }
+}</code></pre>
+<p>结果为：<br>t1come in<br>t1 update value 20<br>三秒后t1线程修改了number的值为20，主线程一直都在循环中，程序无法自动退出。也就是，主线程一直不知道number已被改为其他值。  </p>
+<p>将变量number前加volatile:  </p>
+<pre><code class="java"><span class="class"><span class="keyword">class</span> <span class="title">Source</span></span>{
+    <span class="keyword">volatile</span> <span class="keyword">int</span> number = <span class="number">0</span>;
+    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">()</span></span>{
+        <span class="keyword">this</span>.number = <span class="number">20</span>;
+    }
+}
+
+<span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">VolatileDemo</span> </span>{
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        Source source = <span class="keyword">new</span> Source();
+        <span class="keyword">new</span> Thread(()-&gt;{
+            System.out.println(Thread.currentThread().getName()+<span class="string">"come in"</span>);
+            <span class="keyword">try</span>{
+                TimeUnit.SECONDS.sleep(<span class="number">3</span>);
+            }<span class="keyword">catch</span> (InterruptedException e){
+                e.printStackTrace();
+            }
+            source.add();
+            System.out.println(Thread.currentThread().getName()+<span class="string">" update value "</span>+source.number);
+        },<span class="string">"t1"</span>).start();
+
+        <span class="keyword">while</span>(source.number == <span class="number">0</span>){
+            <span class="comment">//main线程会一直循环读取number的值，直到number不为0</span>
+        }
+        System.out.println(Thread.currentThread().getName()+<span class="string">" is over"</span>);
+    }
+}
+</code></pre>
+<p>输出结果为：<br>t1come in<br>t1 update value 20<br>main is over<br>main线程不再一直在循环中等待，也就证明了volatile的保证可见性的特性。  </p>
+<p><strong>volatile的不保证原子性：</strong><br>原子性代表的是不可分割，保证完整性，要么做完，要么不做。  </p>
+<pre><code class="java"><span class="class"><span class="keyword">class</span> <span class="title">Source</span></span>{
+    <span class="keyword">volatile</span> <span class="keyword">int</span> number = <span class="number">0</span>;
+    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">addPlus</span><span class="params">()</span></span>{
+        number++;
+    }
+}
+
+<span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">VolatileDemo</span> </span>{
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        Source source = <span class="keyword">new</span> Source();
+        <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>;i &lt; <span class="number">10</span>;i++){
+            <span class="keyword">new</span> Thread(()-&gt;{
+                <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">0</span>;j &lt; <span class="number">100</span>;j++){
+                    source.addPlus();
+                }
+            },String.valueOf(i)).start();
+        }
+        <span class="comment">//等待上面的线程执行完成后，调用main线程查看最终的number的值</span>
+        <span class="comment">//判断大于2的原因是：除了main线程外还有一个后台GC线程</span>
+        <span class="keyword">while</span>(Thread.activeCount() &gt; <span class="number">2</span>){
+            Thread.yield();
+        }
+        System.out.println(Thread.currentThread().getName()+<span class="string">"current number is "</span>+source.number);
+    }
+}</code></pre>
+<p>10个线程，每个线程执行100次number++的操作，如果volatile保证原子性的话，那最终的结果应该是1000。但是最终的运行结果不是，因此证明了volatile无法保证原子性。<br>那么为什么volatile不保证原子性呢？以下举例来解释：<br>首先有两个线程，二者均将主内存中的变量拷贝回自己的工作内存；<br>接着，当线程1调用addPlus()方法将自己的number值加1后(number=1)，正准备写回主内存，可此时因底层调度机制，线程1被挂起；<br>然后，线程2在自己的时间片中完成了addPlus()方法，且将结果写回了主内存，但来不及通知线程1，number的值已经被修改为1；<br>最后，线程1被激活则会继续做未完成的步骤，即将在自己工作内存中改变的变量值写回到主内存，这样就造成数据复写和数据丢失的后果了。  </p>
+<p>那么如何保证原子性呢？<br>1、使用sychronized对变量进行加锁<br>在多线程的环境下不推荐此种用法，因为其虽然能解决问题，但是并发性差。<br>2、使用AtomicInteger(原子性整形封装，实在java.util.concurrent.atomic包下的)  </p>
+<pre><code class="java"><span class="class"><span class="keyword">class</span> <span class="title">Source</span></span>{
+    AtomicInteger atomicInteger = <span class="keyword">new</span> AtomicInteger();
+    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">addAtomic</span><span class="params">()</span></span>{
+        atomicInteger.getAndIncrement();
+    }    
+}
+
+<span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">VolatileDemo</span> </span>{
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        Source source = <span class="keyword">new</span> Source();
+        <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>;i &lt; <span class="number">10</span>;i++){
+            <span class="keyword">new</span> Thread(()-&gt;{
+                <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">0</span>;j &lt; <span class="number">100</span>;j++){
+                    <span class="comment">//source.addPlus();</span>
+                    source.addAtomic();
+                }
+            },String.valueOf(i)).start();
+        }
+        <span class="keyword">while</span>(Thread.activeCount() &gt; <span class="number">2</span>){
+            Thread.yield();
+        }
+        System.out.println(Thread.currentThread().getName()+<span class="string">"current number is "</span>+source.atomicInteger);<span class="comment">//使用的是原子性的number值</span>
+    }
+}</code></pre>
+<p>此时输出的结果为1000，即保证了原子性。  </p>
+<p><strong>volatile的禁止重排序</strong><br>先了解一下有序性的相关概念<br>计算机在执行程序的时候，为了提高性能，编译器和处理器常常会对指令做重排序的操作，一般分为以下几种：  </p>
+<ul>
+<li>单线程环境里面确保程序最终执行结果和代码顺序执行的结果一致（即指令重排对单线程无影响）  </li>
+<li>处理器在进行重排序时必须要考虑指令之间的数据依赖性（即逻辑顺序）  </li>
+<li>多线程环境中线程交替执行，因编译器优化重排序的存在，多个线程使用的变量是否能保证一致性时无法确认的（结果无法预测）  </li>
+</ul>
+<p>指令重排：源代码按顺序排列，但是底层为了执行代码的效率能够得到提高，不一定也会按照源代码的编写顺序执行，尤其是多线程环境  </p>
+<p>例1：  </p>
+<pre><code class="java"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">sort</span><span class="params">()</span></span>{
+  <span class="keyword">int</span> x = <span class="number">1</span>;     <span class="comment">//1</span>
+  <span class="keyword">int</span> y = <span class="number">2</span>;     <span class="comment">//2</span>
+  x = x + <span class="number">5</span>;     <span class="comment">//3</span>
+  y = x + x;     <span class="comment">//4</span>
+}</code></pre>
+<p>那此时语句4是否可以为第一句？那肯定是不行的，因为变量必须得先定义，这样会违背数据的依赖性。    </p>
+<p>例2:  </p>
+<pre><code class="java"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Demo</span></span>{
+  <span class="keyword">int</span> a = <span class="number">0</span>;
+  <span class="keyword">boolean</span> flag = <span class="keyword">false</span>;
+  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">method</span><span class="params">()</span></span>{
+     a = <span class="number">1</span>;        <span class="comment">//1</span>
+     flag = <span class="keyword">true</span>;  <span class="comment">//2</span>
+  }
+  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">method01</span><span class="params">()</span></span>{
+      <span class="keyword">if</span>(flag){
+        a = a + <span class="number">5</span>;
+        system.out.println(<span class="string">"a = "</span>+a);
+      }
+  }
+}</code></pre>
+<p>上述代码在多线程情况下则有可能会出现：一个线程的语句2先被执行，另一个线程先执行了method01()方法，导致最后的a = 5，与正常顺序执行的a的结果不同，这样就没有抱枕该数据的一致性了。故需要用volatile来禁止指令重排。  </p>
+<p>以高并发下的DCL模式为例讲解禁止指令重排：  </p>
+<pre><code class="java"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SingletonDemo</span> </span>{
+    <span class="keyword">private</span> <span class="keyword">static</span> SingletonDemo instance = <span class="keyword">null</span>;
+    <span class="function"><span class="keyword">private</span> <span class="title">SingletonDemo</span><span class="params">()</span></span>{
+        System.out.println(<span class="string">"无参构造方法"</span>);
+    }
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> SingletonDemo <span class="title">getInstance</span><span class="params">()</span></span>{
+        <span class="keyword">if</span>(instance == <span class="keyword">null</span>){
+             instance = <span class="keyword">new</span> SingletonDemo();
+        }
+        <span class="keyword">return</span> instance;
+    }
+
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>;i &lt; <span class="number">10</span>;i++){
+            <span class="keyword">new</span> Thread(()-&gt;{
+                SingletonDemo.getInstance();
+            },String.valueOf(i)).start();
+        }
+    }
+}</code></pre>
+<p>在单线程模式下调用getInstance()方法只会输出一个 “无参构造方法”。但是若是在多线程环境下测试，则会多次输出，这样就算不上是单例的概念了。那么接下来就介绍DCL模式，即双端检索机制的代码。  </p>
+<pre><code class="java"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SingletonDemo</span> </span>{
+    <span class="keyword">private</span> <span class="keyword">static</span> SingletonDemo instance = <span class="keyword">null</span>;
+    <span class="function"><span class="keyword">private</span> <span class="title">SingletonDemo</span><span class="params">()</span></span>{
+        System.out.println(<span class="string">"无参构造方法"</span>);
+    }
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> SingletonDemo <span class="title">getInstance</span><span class="params">()</span></span>{
+        <span class="keyword">if</span>(instance == <span class="keyword">null</span>){
+             <span class="keyword">synchronized</span> (SingletonDemo<span class="class">.<span class="keyword">class</span>)</span>{
+                 <span class="keyword">if</span>(instance == <span class="keyword">null</span>){
+                     instance = <span class="keyword">new</span> SingletonDemo();
+                 }
+             }
+        }
+        <span class="keyword">return</span> instance;
+    }
+
+    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>{
+        <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>;i &lt; <span class="number">10</span>;i++){
+            <span class="keyword">new</span> Thread(()-&gt;{
+                SingletonDemo.getInstance();
+            },String.valueOf(i)).start();
+        }
+    }
+}</code></pre>
+<p>instance = new SingletonDemo();可以分成三步完成创建对象操作<br>1、memory = allocate(); //分配对象的内存空间<br>2、instance(memory); //初始化对象<br>3、instance = memory; //设置instance第一步分配的内存空间<br>当执行的顺序变成1-&gt;3-&gt;2时，可知还未完成初始化怎能为初始化的对象指向地址。所以这种情况下还不是完全安全的，需要排除指令重排带来的问题，故可以使用volatile禁止指令重排的特性在instance前加volatile进行修饰，即：  </p>
+<pre><code class="java"><span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> SingletonDemo instance = <span class="keyword">null</span>;</code></pre>
+<p>禁止指令重排的知识小结：<br>1、volatile实现禁止指令重排优化，从而避免多线程环境下程序出现乱序执行现象；<br>2、<strong>内存屏障</strong>(Memory Barrier)，又可以称为内存栅栏，它是一个CPU指令，起到保证特定操作的执行顺序和保证某些变量的内存可见性的作用；<br>3、由于编译器和处理器都可以执行指令重排的优化指令，若在指令间加一条内存屏障，则可以高斯编译器和处理器，不论什么指令都不能和这条内存屏障指令进行重排序操作，也就是说可以通过内存屏障禁止在其前后的指令进行重排序；<br>4、写内存屏障（Store Memory Barrier）：处理器将存储缓存值写回主存（阻塞方式）<br>   读内存屏障（Load Memory Barrier）：处理器，处理失效队列（阻塞方式）<br>5、内存屏障种类<br><a href="https://ae01.alicdn.com/kf/Hd5390602779c42869426934073c5a77dD.png" target="_blank" rel="noopener">图3</a><br>6、volatile读前插读屏障，写后加写屏障，避免CPU重排导致的问题，实现多线程之间数据的可见性<br>7、对于处理器来说，内存屏障会导致cpu缓存的刷新，刷新时，会遵循缓存一致性协议:  </p>
+<ul>
+<li>解锁时(lock)，jvm会强制刷新cpu缓存，导致当前线程更改，对其他线程可见;  </li>
+<li>标记volatile的字段，在写操作时，会强制刷新cpu缓存，标记volatile的字段，每次读取都是直接读内存;  </li>
+<li>编译器在final写操作后，会插入内存屏障，来禁止重排序，保证可见性。  </li>
+</ul>
+<p><strong>以上内容是自己学习时看书看视频教学查询网络的总结</strong></p>
+
     </article>
     <!-- license  -->
     
         <div class="license-wrapper">
             <p>Author：汪小雨
             <p>发表日期：April 4th 2020, 2:52:47 pm
-            <p>更新日期：April 7th 2020, 2:43:48 pm
+            <p>更新日期：April 7th 2020, 2:56:20 pm
             <p>版权声明：本文采用<a rel="license noopener" href="http://creativecommons.org/licenses/by-nc/4.0/" target="_blank">知识共享署名-非商业性使用 4.0 国际许可协议</a>进行许可</p>
         </div>
     
