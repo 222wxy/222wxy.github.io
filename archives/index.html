@@ -354,6 +354,33 @@
     
     
     <article class="index-post">
+        <a class="abstract-title" href = "/2020/04/13/CAS%E5%8E%9F%E7%90%86/" >
+            
+                <span>CAS原理</span>
+        </a>
+        <div class="abstract-content">
+            Compare And Swap，比较和交换。      
+12AtomicInteger atomicInteger = new AtomicInteger(5);//此处的参数指的是主内存中的初始值atomicInteger.compareAndSet(5,2019);//第一个参数指的是期望值，第二个参数指的是修改值
+
+接着让我们来看一下compareAndSet()方法的源码：  
+123public final boolean compareAndSet(int expect, int update) &#123;    return unsafe.compareAndSwap...
+        </div>
+        <div class="abstract-post-meta">
+            <!-- date  -->
+            <div class="abstract-date">
+                <span class="abstract-calander iconfont-archer">&#xe676;</span><span class="abstract-time">2020/04/13</span>
+            </div>
+            <!-- tags  -->
+            
+        </div>
+    </article>
+    
+    
+    
+    
+    
+    
+    <article class="index-post">
         <a class="abstract-title" href = "/2020/04/08/%E9%9D%A2%E8%AF%95%E9%A2%98%E9%9B%86/" >
             
                 <span>面试题集</span>
@@ -511,9 +538,16 @@ JMM中关于同步的三条规定：
     
     
     
+    
+    
+    
+    
+    
+    
+    
     <div class="total-and-search">
         <div class="total-archive">
-        Total : 2
+        Total : 3
         </div>
         <!-- search  -->
         
@@ -526,6 +560,11 @@ JMM中关于同步的三条规定：
     
     <div class="archive-year"> 2020 </div>
     <ul class="year-list">
+    
+    
+        <li class="archive-post-item">
+            <span class="archive-post-date">04/13</span><a class="archive-post-title" href= "/2020/04/13/CAS%E5%8E%9F%E7%90%86/" >CAS原理</a>
+        </li>
     
     
         <li class="archive-post-item">
